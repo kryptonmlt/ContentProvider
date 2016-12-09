@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -19,6 +20,7 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 import org.kryptonmlt.content.provider.pojos.Content;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -32,13 +34,20 @@ import org.w3c.dom.NodeList;
 @Component
 public class ContentFileRepository {
 
-    private final Map<String, List<Content>> contents = new HashMap<>();
+    private Map<String, List<Content>> contents;
+
+    private final String contentslock = "";
 
     private final SimpleDateFormat parser = new SimpleDateFormat("dd/MM/yyyy zzz");
 
     private final String RESOURCE_FILE = "contents.xml";
 
-    public ContentFileRepository() throws Exception {
+    public ContentFileRepository() {
+    }
+
+    @Scheduled(fixedDelay = 600000)
+    public void reloadData() throws Exception {
+
         File fXmlFile = new File(RESOURCE_FILE);
         DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
         DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
@@ -48,6 +57,7 @@ public class ContentFileRepository {
         //read this - http://stackoverflow.com/questions/13786607/normalization-in-dom-parsing-with-java-how-does-it-work
         doc.getDocumentElement().normalize();
         NodeList nList = doc.getElementsByTagName("content");
+        Map<String, List<Content>> tempContents = new HashMap<>();
 
         for (int temp = 0; temp < nList.getLength(); temp++) {
 
@@ -57,19 +67,22 @@ public class ContentFileRepository {
 
                 Element eElement = (Element) nNode;
 
-                //eElement.getAttribute("id");
+                int id = Integer.parseInt(eElement.getAttribute("id"));
                 String type = eElement.getElementsByTagName("type").item(0).getTextContent();
                 Date date = parser.parse(eElement.getElementsByTagName("date").item(0).getTextContent());
-                if (contents.get(type) == null) {
-                    contents.put(type, new ArrayList<Content>());
+                if (tempContents.get(type) == null) {
+                    tempContents.put(type, new ArrayList<Content>());
                 }
-                contents.get(type).add(new Content(eElement.getElementsByTagName("title").item(0).getTextContent(), date.getTime(),
-                        nodeToString(eElement.getElementsByTagName("html").item(0), "html")));
+                tempContents.get(type).add(new Content(id, eElement.getElementsByTagName("title").item(0).getTextContent(), date.getTime(),
+                        nodeToString(eElement.getElementsByTagName("html").item(0), "html"), nodeToString(eElement.getElementsByTagName("summary").item(0), "summary")));
 
             }
         }
-        for (String type : contents.keySet()) {
-            Collections.sort(contents.get(type));
+        for (String type : tempContents.keySet()) {
+            Collections.sort(tempContents.get(type));
+        }
+        synchronized (contentslock) {
+            contents = tempContents;
         }
     }
 
@@ -86,14 +99,25 @@ public class ContentFileRepository {
     }
 
     public List<Content> getContents(String type) {
-        if (contents.get(type) == null) {
-            return new ArrayList<>();
+        List<Content> result = new ArrayList<>();
+        synchronized (contentslock) {
+            if (contents.get(type) != null) {
+                for (Content c : contents.get(type)) {
+                    result.add(new Content(c.getId(), c.getTitle(), c.getDate(), c.getHtml(), c.getSummary()));
+                }
+            }
         }
-        return contents.get(type);
+        return result;
     }
 
     public Set<String> getTypes() {
-        return contents.keySet();
+        Set<String> types = new HashSet<>();
+        synchronized (contentslock) {
+            for (String s : contents.keySet()) {
+                types.add(s);
+            }
+        }
+        return types;
     }
 
 }

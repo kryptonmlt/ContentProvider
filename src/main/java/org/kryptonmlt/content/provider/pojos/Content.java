@@ -6,19 +6,41 @@ package org.kryptonmlt.content.provider.pojos;
  */
 public class Content implements Comparable<Content> {
 
+    private int id;
+
     private String title;
 
     private long date;
 
     private String html;
 
+    private String summary;
+
     public Content() {
     }
 
-    public Content(String title, long date, String html) {
+    public Content(int id, String title, long date, String html, String summary) {
+        this.id = id;
         this.title = title;
         this.date = date;
         this.html = html;
+        this.summary = summary;
+    }
+
+    public String getSummary() {
+        return summary;
+    }
+
+    public void setSummary(String summary) {
+        this.summary = summary;
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public void setId(int id) {
+        this.id = id;
     }
 
     public String getHtml() {
@@ -47,7 +69,7 @@ public class Content implements Comparable<Content> {
 
     @Override
     public String toString() {
-        return "Content{" + "title=" + title + ", date=" + date + ", html=" + html + '}';
+        return "Content{" + "id=" + id + ", title=" + title + ", date=" + date + ", html=" + html + ", summary=" + summary + '}';
     }
 
     @Override
